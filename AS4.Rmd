@@ -1,0 +1,133 @@
+---
+title: "AS4"
+output: pdf_document
+date: '2022-12-29'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(patchwork)
+```
+
+# Aufgabe 1
+
+```{r}
+dataraw=read.csv("C:/Users/73907/Desktop/Problem set R W2223/Energieerzeugung_long_format.csv")
+dataraw$date=as.Date(dataraw$date,format = "%d.%m.%Y")
+dataraw$source[dataraw$source=="Wind_Offshore"]="Wind (Offshore)"
+dataraw$source[dataraw$source=="Wind_Onshore"]="Wind (Onshore)"
+dataraw$source[dataraw$source=="Sonstige_Erneuerbare_Energien"]="Sonstige Erneuerbare Energien"
+dataraw$source[dataraw$source=="Sonstige_Konventionelle_Energien"]="Sonstige Konventionelle Energien"
+```
+
+## a)
+
+```{r}
+a=dataraw |> filter(date %in% c(as.Date("2022-12-10"),as.Date("2022-08-01")))
+table(a$date)
+```
+
+```{r}
+unique(a$source)
+```
+
+```{r}
+
+a$renewable=ifelse(a$source %in% unique(a$source)[1:6],"renewable energy","non-renewable energy")
+
+
+a$renewable=as.factor(a$renewable)
+```
+
+```{r}
+a |> group_by(date,renewable,source) |> 
+  summarise(avg=mean(energy))|>
+  ggplot(aes(source,avg,fill=renewable))+
+  geom_bar(stat="identity") +facet_grid(renewable~date,scales = "free")+
+  coord_flip()+
+  labs(y = "Energieerzeugung in [MWh]",x="")+
+ theme(legend.position = "none") +
+  scale_fill_manual(values=c("#873e23", "#055204"))
+```
+
+## b)
+
+```{r}
+dataraw |> select(-c("start","end")) |> 
+  group_by(date,source) |> summarise(avg_energy=mean(energy)) |> 
+  ungroup() |> 
+  mutate(renewable=ifelse(source %in% unique(a$source)[1:6],"renewable energy","non-renewable energy")) |> 
+  group_by(date,renewable) |> 
+  summarise(avg=sum(avg_energy)) |> 
+  ungroup() |>
+  mutate(month=factor(months(date,abbreviate = T), levels = month.abb)) |>
+  ggplot(aes(x=month, y=avg, fill=renewable))+
+  geom_boxplot()+ggtitle("Energy Production per month")+
+  scale_fill_manual(values=c("#999999", "#56B4E9"))+
+  theme_bw()
+```
+
+# Aufgabe 2
+
+## a)
+
+```{r}
+pricesraw=read.csv2("C:/Users/73907/Desktop/Problem set R W2223/Handelspreise_per_hour.csv")
+pricesraw$Date=as.Date(pricesraw$Date,format = "%d.%m.%Y")
+```
+
+
+```{r}
+pricesraw |> filter(Date %in% as.Date(c("2022-02-24","2022-06-14","2022-12-05"))) |> 
+  ggplot(aes(Start,Deutschland,group=Date))+
+  geom_line(col="blue")+facet_wrap(.~Date,ncol = 1)+
+  ggtitle("Deutschland")+labs(y = "Preis",x="Uhrzeit")+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+## b)
+
+
+```{r}
+colnames(pricesraw)
+```
+
+```{r}
+b=pricesraw |> mutate(Denmark=(Dänemark_1+Dänemark_2)/2) |>
+  select(-c("Dänemark_1","Dänemark_2")) |>
+  pivot_longer(Deutschland:Denmark,
+                    names_to='Land',
+                    values_to='price') |>
+  group_by(Date,Land) |> 
+  summarise(Preis=max(price)) |>
+  ungroup()
+```
+
+```{r}
+p1=b |> filter(Land %in% c("Deutschland","Schweden","Italien")) |>
+  mutate(Land =factor(Land,levels = c("Deutschland","Schweden","Italien"))) |>
+  ggplot(aes(x=Date, y=Preis,group=Land)) + 
+  geom_point(alpha = 0.3) +geom_smooth(se=FALSE,method = "loess")+
+  facet_wrap(.~Land,ncol = 1,scales = "free")+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+```
+
+```{r}
+p2=b |>
+ggplot() +
+  geom_smooth(aes(x=Date, y=Preis,col=Land),se = FALSE, method = "loess") +
+  scale_color_grey()+
+  theme(panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+panel.background = element_blank(), axis.line = element_line(colour = "black"))
+
+```
+
+
+```{r}
+p1+p2
+```
+
